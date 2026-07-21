@@ -1,0 +1,6 @@
+name: hyperdrive_labs_flutter
+environment:
+  sdk: ">=3.12.2 <4.0.0"
+
+workspace:
+  - packages/hyperdrive_labs_telemetry

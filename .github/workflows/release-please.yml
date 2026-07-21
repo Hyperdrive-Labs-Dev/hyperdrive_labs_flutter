@@ -1,0 +1,23 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+
+# Elevated permissions required to create PRs, tags, and Releases
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Release Please
+        uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          token: ${{ secrets.RELEASE_PLEASE_PAT }}

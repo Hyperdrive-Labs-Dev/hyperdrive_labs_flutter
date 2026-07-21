@@ -1,0 +1,56 @@
+name: Quality Control
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+      - develop
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+# Restrict permissions for security on PRs
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.x"
+          channel: "stable"
+          cache: true
+          pub-cache: true
+
+      - name: Install Very Good CLI (for workspace testing)
+        run: dart pub global activate very_good_cli
+
+      # Dart Workspaces links all apps and packages in one step
+      - name: Fetch Dependencies
+        run: flutter pub get
+
+      - name: Lint and Analyze
+        run: flutter analyze . --fatal-infos
+
+      # Runs tests recursively across all /apps and /packages
+      - name: Run Workspace Tests
+        run: $HOME/.pub-cache/bin/very_good test --recursive

@@ -1,0 +1,7 @@
+{
+  "packages": {
+    "packages/hyperdrive_labs_telemetry": {
+      "release-type": "dart"
+    }
+  }
+}

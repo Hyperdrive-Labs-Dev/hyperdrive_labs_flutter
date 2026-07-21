@@ -1,0 +1,49 @@
+name: Publish to pub.dev
+
+on:
+  push:
+    tags:
+      # Triggers on tags like company_ui-v1.0.0 or company_observability-v0.2.1
+      - "*-[vV][0-9]+.[0-9]+.[0-9]+*"
+
+permissions:
+  contents: read
+  id-token: write # REQUIRED: Allows GitHub to issue temporary OIDC tokens to pub.dev
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 1. Parse tag (e.g., "company_ui-v1.0.0" -> "packages/company_ui")
+      - name: Determine Package Path
+        id: package_info
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          PACKAGE_NAME=$(echo "$TAG_NAME" | sed -E 's/-[vV].*//')
+
+          echo "Extracted package name: $PACKAGE_NAME"
+          echo "path=packages/$PACKAGE_NAME" >> $GITHUB_OUTPUT
+
+      # 2. Setup Dart / Flutter
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.x"
+          channel: "stable"
+
+      # 3. Setup Dart Action explicitly
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+
+      # 4. Fetch dependencies at workspace root
+      - name: Fetch Dependencies
+        run: flutter pub get
+
+      # 5. Publish the targeted sub-package via OIDC
+      - name: Publish Package to pub.dev
+        run: |
+          cd ${{ steps.package_info.outputs.path }}
+          dart pub publish --force
