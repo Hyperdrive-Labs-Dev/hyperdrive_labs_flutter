@@ -1,0 +1,22 @@
+name: hyperdrive_labs_telemetry
+description: "Internal OpenTelemetry and Crash Tracking client for Flutter."
+version: 0.0.1
+homepage: https://www.hyperdrivelabs.dev/
+resolution: workspace
+
+environment:
+  sdk: ^3.12.2
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.6.0
+  path_provider: ^2.1.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
