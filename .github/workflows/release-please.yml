@@ -14,10 +14,19 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
+      # 1. Generate a valid token as the GitHub App
+      - name: Generate Token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+
+      # 2. Pass that token into Release Please
       - name: Run Release Please
         uses: googleapis/release-please-action@v4
         id: release
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-          token: ${{ secrets.RELEASE_PLEASE_PAT }}
+          token: ${{ steps.app-token.outputs.token }}
