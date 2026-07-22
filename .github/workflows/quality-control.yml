@@ -54,6 +54,9 @@ jobs:
       - name: Lint and Analyze
         run: flutter analyze . --fatal-infos
 
+      - name: Dry Run Publish
+        run: dart pub publish --dry-run
+
       # Runs tests recursively across all /apps and /packages
       - name: Run Workspace Tests
         run: $HOME/.pub-cache/bin/very_good test --recursive
