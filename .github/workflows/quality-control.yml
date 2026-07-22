@@ -5,10 +5,11 @@ on:
     branches:
       - develop
   pull_request:
-    types: [opened, synchronize, edited, reopened]
+    types: [opened, synchronize, edited, reopened, labeled]
     branches:
       - develop
       - main
+      - "release-please--**" # Catch scoped release PRs created by Release Please
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
