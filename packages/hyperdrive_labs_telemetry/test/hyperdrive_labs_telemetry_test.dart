@@ -170,6 +170,20 @@ void main() {
     final stackTraceAttr = recordAttrs.firstWhere(
       (attr) => attr['key'] == 'exception.stacktrace',
     );
+    final exceptionTypeAttr = recordAttrs.firstWhere(
+      (attr) => attr['key'] == 'exception.type',
+    );
+    final exceptionMessageAttr = recordAttrs.firstWhere(
+      (attr) => attr['key'] == 'exception.message',
+    );
+    expect(
+      exceptionTypeAttr['value']['stringValue'],
+      equals('FormatException'),
+    );
+    expect(
+      exceptionMessageAttr['value']['stringValue'],
+      equals('FormatException: Bad character'),
+    );
     expect(
       stackTraceAttr['value']['stringValue'],
       equals('#0 main (main.dart:15)'),

@@ -111,6 +111,16 @@ class HyperdriveLabsTelemetry {
                     "body": {"stringValue": exception},
                     "attributes": [
                       {
+                        "key": "exception.type",
+                        "value": {
+                          "stringValue": exception.split(':').first.trim(),
+                        },
+                      },
+                      {
+                        "key": "exception.message",
+                        "value": {"stringValue": exception},
+                      },
+                      {
                         "key": "exception.stacktrace",
                         "value": {"stringValue": stackTrace},
                       },
