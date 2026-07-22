@@ -42,6 +42,13 @@ jobs:
       - name: Fetch Dependencies
         run: flutter pub get
 
+      - name: Build code
+        run: dart run build_runner build
+
+      - name: Create dynamic .pubignore from .gitignore
+        run: |
+          grep -v "lib/src/version.dart" .gitignore > .pubignore
+
       # 5. Publish the targeted sub-package via OIDC
       - name: Publish Package to pub.dev
         run: |
