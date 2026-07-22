@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// An offline-first crash reporter that intercepts uncaught Flutter and Dart
@@ -81,10 +82,14 @@ class HyperdriveLabsTelemetry {
     try {
       final dir = await _getStorageDir();
       final queueDir = Directory('${dir.path}/otel_queue');
+
       if (!queueDir.existsSync()) queueDir.createSync(recursive: true);
 
       final timestamp = DateTime.now().microsecondsSinceEpoch;
       final file = File('${queueDir.path}/log_$timestamp.json');
+
+      final packageInfo = await PackageInfo.fromPlatform();
+      final appVersion = "${packageInfo.version}+${packageInfo.buildNumber}";
 
       final otlpPayload = {
         "resourceLogs": [
@@ -94,6 +99,10 @@ class HyperdriveLabsTelemetry {
                 {
                   "key": "service.name",
                   "value": {"stringValue": serviceName},
+                },
+                {
+                  "key": "service.version",
+                  "value": {"stringValue": appVersion},
                 },
                 {
                   "key": "os.type",
