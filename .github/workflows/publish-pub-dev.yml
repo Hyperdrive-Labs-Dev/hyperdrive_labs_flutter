@@ -43,7 +43,7 @@ jobs:
         run: flutter pub get
 
       - name: Build code
-        run: dart run build_runner build
+        run: dart run build_runner build --workspace
 
       - name: Create dynamic .pubignore from .gitignore
         run: |

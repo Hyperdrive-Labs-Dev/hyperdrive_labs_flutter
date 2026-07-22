@@ -49,7 +49,7 @@ jobs:
         run: flutter pub get
 
       - name: Build code
-        run: dart run build_runner build
+        run: dart run build_runner build --workspace
 
       - name: Lint and Analyze
         run: flutter analyze . --fatal-infos
