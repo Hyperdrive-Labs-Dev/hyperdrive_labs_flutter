@@ -99,6 +99,10 @@ class HyperdriveLabsTelemetry {
                   "key": "os.type",
                   "value": {"stringValue": Platform.operatingSystem},
                 },
+                {
+                  "key": "os.version",
+                  "value": {"stringValue": Platform.operatingSystemVersion},
+                },
               ],
             },
             "scopeLogs": [
