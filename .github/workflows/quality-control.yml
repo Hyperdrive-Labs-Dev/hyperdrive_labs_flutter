@@ -55,8 +55,38 @@ jobs:
       - name: Lint and Analyze
         run: flutter analyze . --fatal-infos
 
-      - name: Dry Run Publish
-        run: dart pub publish --dry-run
+      - name: Get Changed Packages & Run Dry Run
+        run: |
+          # 1. Determine base target branch (e.g., origin/develop or origin/main)
+          TARGET_BRANCH="origin/${{ github.base_ref || 'develop' }}"
+
+          echo "Comparing changes against $TARGET_BRANCH..."
+
+          # 2. Extract changed package paths inside `packages/`
+          CHANGED_PACKAGES=$(git diff --name-only "$TARGET_BRANCH"...HEAD | grep '^packages/' | cut -d/ -f1,2 | sort -u || true)
+
+          if [ -z "$CHANGED_PACKAGES" ]; then
+            echo "No packages inside 'packages/' were modified."
+            exit 0
+          fi
+
+          echo "Found modified packages:"
+          echo "$CHANGED_PACKAGES"
+          echo "--------------------------------------------------"
+
+          # 3. Loop over changed package directories
+          for pkg in $CHANGED_PACKAGES; do
+            if [ -f "$pkg/pubspec.yaml" ]; then
+              # Check if package is marked private
+              if grep -q "publish_to: none" "$pkg/pubspec.yaml"; then
+                echo "Skipping $pkg (Private package / publish_to: none)"
+              else
+                echo "Running 'dart pub publish --dry-run' in $pkg..."
+                (cd "$pkg" && dart pub get && dart pub publish --dry-run)
+                echo "--------------------------------------------------"
+              fi
+            fi
+          done
 
       # Runs tests recursively across all /apps and /packages
       - name: Run Workspace Tests
