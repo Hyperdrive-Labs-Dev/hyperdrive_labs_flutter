@@ -4,18 +4,29 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:hyperdrive_labs_telemetry/hyperdrive_labs_telemetry.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory tempDir;
-  final testEndpoint = Uri.parse('https://uptrace.test/v1/logs');
-  final testHeaders = {'uptrace-dsn': 'https://token@uptrace.test/1'};
+  final testEndpoint = Uri.parse('https://otel-host.test/v1/logs');
+  final testHeaders = {'upstream-dsn': 'https://token@otel-host.test/1'};
 
   setUp(() async {
     // Create an isolated temp directory for each test run
     tempDir = await Directory.systemTemp.createTemp('otel_test_');
     HyperdriveLabsTelemetry.testDirectoryPath = tempDir.path;
+
+    // Mock PackageInfo
+    PackageInfo.setMockInitialValues(
+      appName: 'My Cool App',
+      packageName: 'com.example.app',
+      version: '1.2.3',
+      buildNumber: '45',
+      buildSignature: '',
+      installerStore: null,
+    );
   });
 
   tearDown(() async {
@@ -100,8 +111,8 @@ void main() {
 
       // Assert: Headers and OTLP payload payload were sent correctly
       expect(
-        sentHeaders['uptrace-dsn'],
-        equals('https://token@uptrace.test/1'),
+        sentHeaders['upstream-dsn'],
+        equals('https://token@otel-host.test/1'),
       );
       expect(sentHeaders['Content-Type'], equals('application/json'));
 
