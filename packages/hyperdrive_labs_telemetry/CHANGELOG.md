@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/compare/hyperdrive_labs_telemetry-v0.2.0...hyperdrive_labs_telemetry-v0.2.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* **hyperdrive_labs_telemetry:** downgrade package_info_plus to ^9.0.1 ([09a4285](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/commit/09a42854af0018a8add6ad8e9960f7a66be97ae1))
+
 ## [0.2.0](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/compare/hyperdrive_labs_telemetry-v0.1.0...hyperdrive_labs_telemetry-v0.2.0) (2026-07-23)
 
 
