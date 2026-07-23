@@ -82,7 +82,7 @@ jobs:
                 echo "Skipping $pkg (Private package / publish_to: none)"
               else
                 echo "Running 'dart pub publish --dry-run' in $pkg..."
-                (cd "$pkg" && dart pub get && dart pub publish --dry-run)
+                (cd "$pkg" && grep -v "lib/src/version.dart" .gitignore > .pubignore && dart pub get && dart pub publish --dry-run)
                 echo "--------------------------------------------------"
               fi
             fi
