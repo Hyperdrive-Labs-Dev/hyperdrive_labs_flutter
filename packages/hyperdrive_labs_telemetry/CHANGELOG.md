@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.0](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/compare/hyperdrive_labs_telemetry-v0.1.0...hyperdrive_labs_telemetry-v0.2.0) (2026-07-23)
+
+
+### Features
+
+* **hyperdrive_labs_telemetry:** add exception.type and exception.message attributes to log record ([4d1b44f](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/commit/4d1b44f95cc4331cd6b614125338dbef151ed748))
+* **hyperdrive_labs_telemetry:** add os.version to resource attributes ([0490c7f](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/commit/0490c7fc77e3c051e83223c7b32fa6a21f24646e))
+* **hyperdrive_labs_telemetry:** add scope to scopeLogs ([b024d44](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/commit/b024d4427afc3b2169ed14b768cbd461d89e0f8f))
+* **hyperdrive_labs_telemetry:** add service.version to resource attributes ([37c56d8](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/commit/37c56d88a21d97af17230233d32f588eb9e86e45))
+
 ## [0.1.0](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/compare/hyperdrive_labs_telemetry-v0.0.1...hyperdrive_labs_telemetry-v0.1.0) (2026-07-21)
 
 
