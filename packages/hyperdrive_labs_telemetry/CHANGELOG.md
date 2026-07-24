@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.0](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/compare/hyperdrive_labs_telemetry-v0.2.1...hyperdrive_labs_telemetry-v0.3.0) (2026-07-24)
+
+
+### Features
+
+* **hyperdrive_labs_telemetry:** add buildDeviceResource helper for device telemetry metadata ([e2d41f1](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/commit/e2d41f10dad3185afdb80a464e57062ca428725b))
+* **hyperdrive_labs_telemetry:** add DiskQueueSpanExporter for offline-first telemetry caching ([cce72da](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/commit/cce72da3530d4f80ea3effb00f9689f047e6a475))
+* **hyperdrive_labs_telemetry:** add OTelDioInterceptor for Dio network tracing ([1a8c7a3](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/commit/1a8c7a30870a4267a674dc5b41e9abb95c928ad6))
+* **hyperdrive_labs_telemetry:** add OTelNavigatorObserver for automated screen tracking ([5435be6](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/commit/5435be643aecda6e7d6b401bd74d83f835bedc60))
+
 ## [0.2.1](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/compare/hyperdrive_labs_telemetry-v0.2.0...hyperdrive_labs_telemetry-v0.2.1) (2026-07-23)
 
 
