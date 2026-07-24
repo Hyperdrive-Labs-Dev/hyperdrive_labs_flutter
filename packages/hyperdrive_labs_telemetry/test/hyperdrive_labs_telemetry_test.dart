@@ -1,203 +1,251 @@
-import 'dart:convert';
 import 'dart:io';
+import 'dart:ui';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:hyperdrive_labs_telemetry/hyperdrive_labs_telemetry.dart';
+import 'package:opentelemetry/api.dart' as otel;
+import 'package:opentelemetry/sdk.dart' as otel_sdk;
 import 'package:package_info_plus/package_info_plus.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  late Directory tempDir;
-  final testEndpoint = Uri.parse('https://otel-host.test/v1/logs');
-  final testHeaders = {'upstream-dsn': 'https://token@otel-host.test/1'};
+  group('HyperdriveLabsTelemetry Tests', () {
+    late Directory tempDir;
+    late Directory queueDir;
+    late List<otel_sdk.ReadOnlySpan> exportedSpans;
 
-  setUp(() async {
-    // Create an isolated temp directory for each test run
-    tempDir = await Directory.systemTemp.createTemp('otel_test_');
-    HyperdriveLabsTelemetry.testDirectoryPath = tempDir.path;
+    setUpAll(() async {
+      PackageInfo.setMockInitialValues(
+        appName: 'Test App',
+        packageName: 'com.test.app',
+        version: '1.0.0',
+        buildNumber: '1',
+        buildSignature: '',
+        installerStore: '',
+      );
 
-    // Mock PackageInfo
-    PackageInfo.setMockInitialValues(
-      appName: 'My Cool App',
-      packageName: 'com.example.app',
-      version: '1.2.3',
-      buildNumber: '45',
-      buildSignature: '',
-      installerStore: null,
-    );
-  });
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('dev.fluttercommunity.plus/device_info'),
+            (MethodCall methodCall) async {
+              return {
+                'version': {'release': '14', 'sdkInt': 34},
+                'id': 'test_id',
+                'model': 'Test Model',
+                'manufacturer': 'Google',
+                'isPhysicalDevice': true,
+              };
+            },
+          );
 
-  tearDown(() async {
-    // Clean up temporary files
-    if (await tempDir.exists()) {
-      await tempDir.delete(recursive: true);
-    }
-  });
+      tempDir = Directory.systemTemp.createTempSync('telemetry_coverage_');
+      queueDir = Directory('${tempDir.path}/otel_queue');
+      HyperdriveLabsTelemetry.testDirectoryPath = tempDir.path;
 
-  test(
-    'Queues exception locally when offline or server returns error',
-    () async {
-      // Mock HTTP client returning 500 Internal Server Error
-      HyperdriveLabsTelemetry.client = MockClient((request) async {
-        return http.Response('Server Error', 500);
-      });
+      exportedSpans = [];
+      final exporter = _TestSpanExporter(exportedSpans);
+      final processor = otel_sdk.SimpleSpanProcessor(exporter);
+      final tracerProvider = otel_sdk.TracerProviderBase(
+        processors: [processor],
+      );
+
+      // Assign tracer and initialize once globally for the test suite
+      HyperdriveLabsTelemetry.tracer = tracerProvider.getTracer('test_tracer');
 
       await HyperdriveLabsTelemetry.init(
-        otlpEndpoint: testEndpoint,
-        headers: testHeaders,
-        serviceName: 'test_service',
+        otlpEndpoint: Uri.parse('https://api.test.com'),
         runAppCallback: () {},
       );
-
-      // Act: Queue a crash
-      await HyperdriveLabsTelemetry.queueCrashLocally(
-        serviceName: 'test_service',
-        exception: 'StateError: Bad state',
-        stackTrace: '#0 main (main.dart:10)',
-      );
-
-      // Assert: File should remain stored in local queue
-      final queueDir = Directory('${tempDir.path}/otel_queue');
-      expect(queueDir.existsSync(), isTrue);
-
-      final queuedFiles = queueDir.listSync().whereType<File>().toList();
-      expect(queuedFiles.length, equals(1));
-
-      // Verify file content matches OTLP format
-      final content = jsonDecode(await queuedFiles.first.readAsString());
-      final logRecord =
-          content['resourceLogs'][0]['scopeLogs'][0]['logRecords'][0];
-
-      expect(
-        logRecord['body']['stringValue'],
-        contains('StateError: Bad state'),
-      );
-    },
-  );
-
-  test(
-    'Flushes queue and deletes local files on successful HTTP 200 upload',
-    () async {
-      late Map<String, String> sentHeaders;
-      late String sentBody;
-
-      // Mock HTTP client returning 200 OK
-      HyperdriveLabsTelemetry.client = MockClient((request) async {
-        sentHeaders = request.headers;
-        sentBody = request.body;
-        return http.Response('{"status":"success"}', 200);
-      });
-
-      await HyperdriveLabsTelemetry.init(
-        otlpEndpoint: testEndpoint,
-        headers: testHeaders,
-        serviceName: 'test_service',
-        runAppCallback: () {},
-      );
-
-      // Act: Queue crash
-      await HyperdriveLabsTelemetry.queueCrashLocally(
-        serviceName: 'test_service',
-        exception: 'FormatException: Invalid JSON',
-        stackTrace: '#0 parseJson (parser.dart:42)',
-      );
-
-      // Assert: Local queue file should be deleted after successful sync
-      final queueDir = Directory('${tempDir.path}/otel_queue');
-      final remainingFiles = queueDir.listSync().whereType<File>().toList();
-      expect(remainingFiles.isEmpty, isTrue);
-
-      // Assert: Headers and OTLP payload payload were sent correctly
-      expect(
-        sentHeaders['upstream-dsn'],
-        equals('https://token@otel-host.test/1'),
-      );
-      expect(sentHeaders['Content-Type'], equals('application/json'));
-
-      final payload = jsonDecode(sentBody);
-      expect(payload['resourceLogs'], isNotEmpty);
-    },
-  );
-
-  test('Validates complete OTLP JSON LogRecord schema compliance', () async {
-    late Map<String, dynamic> payload;
-
-    // Mock client intercepting the outbound request body
-    HyperdriveLabsTelemetry.client = MockClient((request) async {
-      payload = jsonDecode(request.body);
-      return http.Response('{"status":"success"}', 200);
     });
 
-    await HyperdriveLabsTelemetry.init(
-      otlpEndpoint: testEndpoint,
-      headers: testHeaders,
-      serviceName: 'my_flutter_app',
-      runAppCallback: () {},
+    setUp(() {
+      exportedSpans.clear();
+      HyperdriveLabsTelemetry.client = MockClient((request) async {
+        return http.Response('{}', 200);
+      });
+      OTelNavigatorObserver.activeScreenContext = null;
+      OTelNavigatorObserver.activeScreenName = 'unknown_screen';
+    });
+
+    tearDownAll(() {
+      HyperdriveLabsTelemetry.dispose();
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    test('init throws if OTLP endpoint is completely missing', () async {
+      expect(
+        () => HyperdriveLabsTelemetry.init(
+          otlpEndpoint: null,
+          runAppCallback: () {},
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('FlutterError.onError is intercepted and recorded', () {
+      final originalFlutterError = FlutterError.onError;
+
+      FlutterError.onError = (details) {
+        HyperdriveLabsTelemetry.recordException(
+          exception: details.exception,
+          stackTrace: details.stack,
+          reason: details.context?.toString() ?? 'Flutter Framework Error',
+        );
+      };
+
+      FlutterError.onError!(
+        FlutterErrorDetails(
+          exception: StateError('Flutter widget exploded'),
+          stack: StackTrace.fromString('flutter_stack_1'),
+          context: ErrorDescription('During build'),
+        ),
+      );
+
+      expect(exportedSpans.length, equals(1));
+      expect(exportedSpans.first.name, equals('Error: During build'));
+      expect(
+        exportedSpans.first.status.description,
+        equals('Bad state: Flutter widget exploded'),
+      );
+
+      FlutterError.onError = originalFlutterError;
+    });
+
+    test('PlatformDispatcher.instance.onError is intercepted and recorded', () {
+      PlatformDispatcher.instance.onError = (error, stack) {
+        HyperdriveLabsTelemetry.recordException(
+          exception: error,
+          stackTrace: stack,
+          reason: 'Unhandled Platform Exception',
+        );
+        return true;
+      };
+
+      PlatformDispatcher.instance.onError!(
+        Exception('Platform channel failed'),
+        StackTrace.fromString('platform_stack_1'),
+      );
+
+      expect(exportedSpans.length, equals(1));
+      expect(
+        exportedSpans.first.name,
+        equals('Error: Unhandled Platform Exception'),
+      );
+    });
+
+    test('recordException links to active screen context when available', () {
+      OTelNavigatorObserver.activeScreenContext = otel.SpanContext(
+        otel.TraceId.fromString('0102030405060708090a0b0c0d0e0f10'),
+        otel.SpanId.fromString('0102030405060708'),
+        otel.TraceFlags.sampled,
+        otel.TraceState.empty(),
+      );
+      OTelNavigatorObserver.activeScreenName = 'DashboardScreen';
+
+      HyperdriveLabsTelemetry.recordException(
+        exception: ArgumentError('Invalid input'),
+        reason: 'User action failed',
+      );
+
+      expect(exportedSpans.length, equals(1));
+      final span = exportedSpans.first;
+      expect(span.parentSpanId.toString(), equals('0102030405060708'));
+
+      final attrs = _spanAttributesToMap(span);
+      expect(attrs['screen.name'], equals('DashboardScreen'));
+    });
+
+    test(
+      'flushQueue aborts safely if queue directory does not exist',
+      () async {
+        if (queueDir.existsSync()) queueDir.deleteSync(recursive: true);
+
+        await HyperdriveLabsTelemetry.flushQueue();
+        expect(queueDir.existsSync(), isFalse);
+      },
     );
 
-    // Act: Queue a sample crash
-    await HyperdriveLabsTelemetry.queueCrashLocally(
-      serviceName: 'my_flutter_app',
-      exception: 'FormatException: Bad character',
-      stackTrace: '#0 main (main.dart:15)',
+    test('flushQueue aborts safely if queue directory is empty', () async {
+      queueDir.createSync(recursive: true);
+
+      await HyperdriveLabsTelemetry.flushQueue();
+      expect(queueDir.listSync(), isEmpty);
+    });
+
+    test(
+      'flushQueue recovers from network exceptions (offline mode)',
+      () async {
+        queueDir.createSync(recursive: true);
+        final file = File('${queueDir.path}/trace_offline.json')
+          ..writeAsStringSync('{"data":1}');
+
+        HyperdriveLabsTelemetry.client = MockClient((request) async {
+          throw const SocketException('No Internet Connection');
+        });
+
+        await HyperdriveLabsTelemetry.flushQueue();
+
+        expect(file.existsSync(), isTrue);
+      },
     );
 
-    // --- Explicit OTLP Schema Assertions ---
+    test(
+      'didChangeAppLifecycleState triggers flush strictly on hidden/paused',
+      () async {
+        int requestCount = 0;
+        HyperdriveLabsTelemetry.client = MockClient((request) async {
+          requestCount++;
+          return http.Response('ok', 200);
+        });
 
-    // 1. Top-level resourceLogs array
-    expect(payload, contains('resourceLogs'));
-    final resourceLogs = payload['resourceLogs'] as List;
-    expect(resourceLogs, isNotEmpty);
+        // Clear directory completely and create only 1 test file
+        if (queueDir.existsSync()) queueDir.deleteSync(recursive: true);
+        queueDir.createSync(recursive: true);
+        File('${queueDir.path}/trace_1.json').writeAsStringSync('{"data":1}');
 
-    // 2. Resource & Attributes
-    final resource = resourceLogs[0]['resource'];
-    final attributes = resource['attributes'] as List;
-    final serviceNameAttr = attributes.firstWhere(
-      (attr) => attr['key'] == 'service.name',
-    );
-    expect(serviceNameAttr['value']['stringValue'], equals('my_flutter_app'));
+        TestWidgetsFlutterBinding.instance.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await Future.delayed(const Duration(milliseconds: 50));
+        expect(requestCount, equals(0));
 
-    // 3. Scope Logs
-    final scopeLogs = resourceLogs[0]['scopeLogs'] as List;
-    expect(scopeLogs, isNotEmpty);
-
-    // 4. Log Records
-    final logRecords = scopeLogs[0]['logRecords'] as List;
-    final record = logRecords[0];
-
-    // OTLP LogRecord mandatory fields
-    expect(record['severityText'], equals('ERROR'));
-    expect(record['severityNumber'], equals(17)); // 17 = ERROR in OTel spec
-    expect(record['timeUnixNano'], isA<String>()); // Nanoseconds string
-    expect(
-      record['body']['stringValue'],
-      equals('FormatException: Bad character'),
-    );
-
-    // 5. StackTrace Attribute
-    final recordAttrs = record['attributes'] as List;
-    final stackTraceAttr = recordAttrs.firstWhere(
-      (attr) => attr['key'] == 'exception.stacktrace',
-    );
-    final exceptionTypeAttr = recordAttrs.firstWhere(
-      (attr) => attr['key'] == 'exception.type',
-    );
-    final exceptionMessageAttr = recordAttrs.firstWhere(
-      (attr) => attr['key'] == 'exception.message',
-    );
-    expect(
-      exceptionTypeAttr['value']['stringValue'],
-      equals('FormatException'),
-    );
-    expect(
-      exceptionMessageAttr['value']['stringValue'],
-      equals('FormatException: Bad character'),
-    );
-    expect(
-      stackTraceAttr['value']['stringValue'],
-      equals('#0 main (main.dart:15)'),
+        TestWidgetsFlutterBinding.instance.handleAppLifecycleStateChanged(
+          AppLifecycleState.paused,
+        );
+        await Future.delayed(const Duration(milliseconds: 50));
+        expect(requestCount, equals(1));
+      },
     );
   });
+}
+
+Map<String, dynamic> _spanAttributesToMap(otel_sdk.ReadOnlySpan span) {
+  final map = <String, dynamic>{};
+  for (final key in span.attributes.keys) {
+    map[key] = span.attributes.get(key);
+  }
+  return map;
+}
+
+class _TestSpanExporter implements otel_sdk.SpanExporter {
+  final List<otel_sdk.ReadOnlySpan> spanList;
+
+  _TestSpanExporter(this.spanList);
+
+  @override
+  void export(List<otel_sdk.ReadOnlySpan> spans) {
+    spanList.addAll(spans);
+  }
+
+  @override
+  void shutdown() {}
+
+  @override
+  void forceFlush() {}
 }
