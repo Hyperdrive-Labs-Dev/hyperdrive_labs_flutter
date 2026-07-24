@@ -1,16 +1,16 @@
-# hyperdrive_labs_telemetry
+# HyperdriveLabsTelemetry
 
-An offline-first OpenTelemetry (OTLP) crash log collector and reporter for Flutter applications. `hyperdrive_labs_telemetry` automatically intercepts uncaught Flutter framework errors and asynchronous Dart platform errors, formats them into standard OpenTelemetry JSON log records, queues them locally on disk when offline, and flushes them to your OTLP backend endpoint.
+An offline-first OpenTelemetry SDK manager for Flutter. It seamlessly configures distributed tracing, captures unhandled exceptions (Flutter framework errors and platform crashes), auto-tracks navigation screens, and queues OTLP telemetry payloads to disk when the device is offline for reliable batch uploading later.
 
 ---
 
 ## Features
 
-- **Automatic Error Interception:** Hooks directly into `FlutterError.onError` and `PlatformDispatcher.instance.onError` to capture both UI and background Dart crashes.
-- **OTLP Standard Format:** Formats exception reports into valid OpenTelemetry `resourceLogs` with standard attributes (`service.name`, `os.type`, `exception.stacktrace`, severity levels, and Unix nanosecond timestamps).
-- **Offline Disk Buffering:** Saves unsent crash payloads as JSON files in a dedicated local directory (`otel_queue/`), ensuring logs persist across application restarts.
-- **Robust Queue Flushing:** Attempts to flush queued logs upon application boot and immediately after writing new crash reports, safely stopping on HTTP errors or network disconnections without crashing the UI thread.
-- **Test-Friendly Design:** Exposes testing hooks for injecting HTTP mock clients and specifying custom directory paths during automated testing.
+- **Offline-First Disk Queueing:** Automatically buffers OpenTelemetry spans to local disk storage if the network drops and flushes them when connectivity is restored or the app pauses/hides.
+- **Global Error Interception:** Automatically catches and records unhandled `FlutterError` framework exceptions and `PlatformDispatcher` crashes.
+- **Route & Navigation Tracing:** Includes custom `NavigatorObserver` bindings for automatic screen-view journey tracking.
+- **Dio Network Interceptor:** Easily pluggable Dio interceptor for recording outgoing HTTP requests as distributed spans.
+- **Rich Metadata Enrichment:** Automatically attaches device hardware info, OS attributes, and package version metadata using `device_info_plus` and `package_info_plus`.
 
 ---
 
@@ -31,96 +31,109 @@ flutter pub get
 
 ---
 
-## Usage
+## Quick Start
 
-Initialize `HyperdriveLabsTelemetry` inside your `main()` function prior to running the app. Pass your OTLP endpoint URI, custom headers (such as authorization or API keys), service name, and execution callback:
+Initialize the telemetry manager inside your `main()` function before calling `runApp()`. You can supply your OTLP collector endpoint directly or fallback to standard `--dart-define` environment flags.
+
+All parameters in `HyperdriveLabsTelemetry.init()` are optional. If omitted, the package automatically attempts to read configuration values from compile-time environment variables (`--dart-define`) or sensible defaults.
+
+### Minimal Initialization Example
 
 ```dart
-import 'package:flutter/material.dart';
+await HyperdriveLabsTelemetry.init(
+  runAppCallback: () => runApp(const MyApp()),
+);
+```
+
+### Example using all parameters
+
+```dart
+import 'package:flutter/widgets.dart';
 import 'package:hyperdrive_labs_telemetry/hyperdrive_labs_telemetry.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await HyperdriveLabsTelemetry.init(
-    otlpEndpoint: Uri.parse('https://otlp.your-collector.com/v1/logs'),
-    headers: {
-      'Authorization': 'Bearer YOUR_OTLP_TOKEN',
-      'X-Scope-OrgID': 'my-organization',
-    },
+    otlpEndpoint: Uri.parse('https://your-otel-collector.com/v1/traces'),
     serviceName: 'my_flutter_app',
+    headers: {'Authorization': 'Bearer YOUR_TOKEN'},
+    flushInterval: const Duration(seconds: 15),
     runAppCallback: () {
       runApp(const MyApp());
     },
   );
 }
+```
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+### Alternatively via `--dart-define`
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(title: const Text('Telemetry Example')),
-        body: Center(
-          child: ElevatedButton(
-            onPressed: () {
-              // Uncaught errors will automatically be intercepted, queued, and sent
-              throw Exception('Test uncaught error');
-            },
-            child: const Text('Trigger Error'),
-          ),
-        ),
-      ),
-    );
-  }
+You can configure initialization parameters at compile-time without passing them in code:
+
+```bash
+flutter run \
+  --dart-define=OTEL_EXPORTER_OTLP_ENDPOINT=https://your-otel-collector.com/v1/traces \
+  --dart-define=OTEL_SERVICE_NAME=my_flutter_app \
+  --dart-define=OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer TOKEN
+```
+
+Headers passed through `--dart-define` should be comma-separated like so:
+
+```bash
+--dart-define=OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer TOKEN,Other-Header=X,Last-Header=Y
+```
+
+---
+
+## Integration Guides
+
+### 1. Navigation Tracking (`OTelNavigatorObserver`)
+
+To automatically capture screen navigation telemetry and attach active screen context to errors, add the observer to your `MaterialApp` or `CupertinoApp`:
+
+```dart
+MaterialApp(
+  navigatorObservers: [
+    OTelNavigatorObserver(),
+  ],
+  home: const HomeScreen(),
+);
+```
+
+### 2. Network Tracing (`OTelDioInterceptor`)
+
+If you use `Dio` for networking, attach the `OTelDioInterceptor` to record outgoing HTTP calls as distributed traces:
+
+```dart
+import 'package:dio/dio.dart';
+import 'package:hyperdrive_labs_telemetry/hyperdrive_labs_telemetry.dart';
+
+final dio = Dio(BaseOptions(baseUrl: '[https://api.example.com](https://api.example.com)'));
+dio.interceptors.add(OTelDioInterceptor());
+```
+
+### 3. Manual Error Recording
+
+You can manually capture caught exceptions, network errors, or custom business logic failures at any time:
+
+```dart
+try {
+  // Your risky operation
+} catch (e, stackTrace) {
+  HyperdriveLabsTelemetry.recordException(
+    exception: e,
+    stackTrace: stackTrace,
+    reason: 'Failed to parse user profile payload',
+  );
 }
 ```
 
 ---
 
-## Architecture & OTLP Schema
+## Architecture & Lifecycle Management
 
-When an error occurs, `HyperdriveLabsTelemetry` serializes the payload into the standard OTLP JSON structure before writing to disk:
-
-```json
-{
-  "resourceLogs": [
-    {
-      "resource": {
-        "attributes": [
-          {
-            "key": "service.name",
-            "value": { "stringValue": "my_flutter_app" }
-          },
-          { "key": "os.type", "value": { "stringValue": "ios" } }
-        ]
-      },
-      "scopeLogs": [
-        {
-          "logRecords": [
-            {
-              "timeUnixNano": "1710000000000000000",
-              "severityText": "ERROR",
-              "severityNumber": 17,
-              "body": { "stringValue": "Exception: Test uncaught error" },
-              "attributes": [
-                {
-                  "key": "exception.stacktrace",
-                  "value": {
-                    "stringValue": "#0      MyApp.build.<anonymous closure>..."
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    }
-  ]
-}
-```
+- **App Lifecycle Hooks:** The package implements `WidgetsBindingObserver` under the hood. When your app transitions to the `paused` or `hidden` state, it triggers an immediate queue flush to ensure pending telemetry is sent before the OS suspends the process.
+- **Graceful Degradation:** If the device loses internet connection during a background flush, files remain safely locked in local disk storage (`otel_queue/`) and are retried on the next cycle.
 
 ---
 
