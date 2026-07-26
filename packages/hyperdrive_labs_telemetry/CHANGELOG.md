@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/compare/hyperdrive_labs_telemetry-v1.0.0...hyperdrive_labs_telemetry-v1.0.1) (2026-07-26)
+
+
+### Bug Fixes
+
+* remove incorrect delete file in flushQueue ([877023a](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/commit/877023a598e823d0864c2be8162866c65fc03f28))
+
 ## [1.0.0](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/compare/hyperdrive_labs_telemetry-v0.2.1...hyperdrive_labs_telemetry-v1.0.0) (2026-07-24)
 
 
