@@ -260,7 +260,9 @@ class HyperdriveLabsTelemetry with WidgetsBindingObserver {
         if (response.statusCode >= 200 && response.statusCode < 300) {
           await file.delete();
         } else {
-          await file.delete();
+          // Shouldn't delete here! Gotta figure out if we want a retry mechanism here
+          // that ultimately deletes this file if it's failed X amount of times
+          // await file.delete();
           break;
         }
       }
