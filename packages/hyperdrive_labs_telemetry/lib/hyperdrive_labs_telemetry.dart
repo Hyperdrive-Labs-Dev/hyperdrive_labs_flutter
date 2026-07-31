@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
@@ -6,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:hyperdrive_labs_telemetry/hyperdrive_labs_telemetry.dart';
 import 'package:hyperdrive_labs_telemetry/src/build_device_resource.dart';
 import 'package:hyperdrive_labs_telemetry/src/disk_queue_span_exporter.dart';
+import 'package:hyperdrive_labs_telemetry/src/otel_signal_type.dart';
 import 'package:opentelemetry/api.dart' as otel;
 import 'package:opentelemetry/sdk.dart' as otel_sdk;
 import 'package:path_provider/path_provider.dart';
@@ -58,6 +60,9 @@ class HyperdriveLabsTelemetry with WidgetsBindingObserver {
 
   /// Returns the global OpenTelemetry [otel.Tracer] instance.
   static otel.Tracer get tracer => _tracer;
+
+  /// Maximum times a file can fail before being moved to the Dead-Letter Queue.
+  static const int _maxRetries = 3;
 
   static Future<Directory> _getStorageDir() async {
     if (testDirectoryPath != null) {
@@ -242,27 +247,91 @@ class HyperdriveLabsTelemetry with WidgetsBindingObserver {
         return;
       }
 
-      final files = queueDir.listSync().whereType<File>().toList();
+      // Filter out .retry sidecar files and dead_letter folder items
+      final files = queueDir
+          .listSync()
+          .whereType<File>()
+          .where((f) => !f.path.endsWith('.retry'))
+          .toList();
+
       if (files.isEmpty) {
         _isFlushing = false;
         return;
       }
 
-      for (final file in files) {
-        final content = await file.readAsString();
+      // Sort files sequentially so older logs/traces are delivered first
+      files.sort((a, b) => a.path.compareTo(b.path));
 
-        final response = await client.post(
-          _otlpEndpoint,
-          headers: {'Content-Type': 'application/json', ..._headers},
-          body: content,
+      for (final file in files) {
+        final fileName = file.uri.pathSegments.last;
+
+        // Determine the correct signal endpoint based on filename prefix
+        OtelSignalType? signal;
+        if (fileName.startsWith('trace_')) {
+          signal = OtelSignalType.traces;
+        } else if (fileName.startsWith('log_')) {
+          signal = OtelSignalType.logs;
+        } else if (fileName.startsWith('metric_')) {
+          signal = OtelSignalType.metrics;
+        }
+
+        // Unrecognized filename prefix -> Poisoned file -> Move to DLQ immediately
+        if (signal == null) {
+          await _moveToDeadLetterQueue(file, queueDir);
+          continue;
+        }
+
+        // Cleanly append the signal sub-path
+        // E.g. '/api/default' + '/v1/logs' -> '/api/default/v1/logs'
+        final currentPath = _otlpEndpoint.path.endsWith('/')
+            ? _otlpEndpoint.path.substring(0, _otlpEndpoint.path.length - 1)
+            : _otlpEndpoint.path;
+
+        final targetEndpoint = _otlpEndpoint.replace(
+          path: '$currentPath${signal.path}',
         );
 
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          await file.delete();
-        } else {
-          // Shouldn't delete here! Gotta figure out if we want a retry mechanism here
-          // that ultimately deletes this file if it's failed X amount of times
-          // await file.delete();
+        String content;
+        try {
+          content = await file.readAsString();
+          // Quick validation: verify it's valid non-empty JSON
+          final decoded = jsonDecode(content);
+          if (decoded is! Map<String, dynamic>) {
+            throw const FormatException('Invalid OTLP root object');
+          }
+        } catch (_) {
+          // Unparseable / Corrupted JSON payload -> Move to DLQ immediately
+          await _moveToDeadLetterQueue(file, queueDir);
+          continue;
+        }
+
+        try {
+          final response = await client.post(
+            targetEndpoint,
+            headers: {'Content-Type': 'application/json', ..._headers},
+            body: content,
+          );
+
+          if (response.statusCode >= 200 && response.statusCode < 300) {
+            // Success -> Remove main file & its sidecar counter
+            await _clearRetryCount(file);
+            await file.delete();
+          } else if (response.statusCode >= 400 && response.statusCode < 500) {
+            // 4xx Client Error (Bad Request, Malformed Schema, Invalid Auth)
+            // The collector rejected the payload structure permanently.
+            await _moveToDeadLetterQueue(file, queueDir);
+          } else {
+            // 5xx Server Error or Rate Limits (429) -> Retriable failure
+            final attempts = await _incrementRetryCount(file);
+            if (attempts >= _maxRetries) {
+              await _moveToDeadLetterQueue(file, queueDir);
+            } else {
+              // Pause execution so we don't spam a struggling server
+              break;
+            }
+          }
+        } catch (_) {
+          // Network disconnected / host unreachable -> stop loop until next run
           break;
         }
       }
@@ -290,5 +359,61 @@ class HyperdriveLabsTelemetry with WidgetsBindingObserver {
       }
     }
     return map;
+  }
+
+  /// Moves a failed/unparseable file into the dead_letter directory
+  /// so it stops blocking the active telemetry queue.
+  static Future<void> _moveToDeadLetterQueue(
+    File file,
+    Directory queueDir,
+  ) async {
+    try {
+      final dlqDir = Directory('${queueDir.path}/dead_letter');
+      if (!dlqDir.existsSync()) {
+        await dlqDir.create(recursive: true);
+      }
+
+      final fileName = file.uri.pathSegments.last;
+      final targetPath = '${dlqDir.path}/$fileName';
+
+      // Move file to DLQ folder
+      await file.rename(targetPath);
+
+      // Clean up sidecar retry counter file if it exists
+      final retryFile = File('${file.path}.retry');
+      if (retryFile.existsSync()) {
+        await retryFile.delete();
+      }
+    } catch (_) {}
+  }
+
+  /// Increments the local retry count for a file using a sidecar `.retry` file.
+  /// Returns the updated retry count.
+  static Future<int> _incrementRetryCount(File file) async {
+    try {
+      final retryFile = File('${file.path}.retry');
+      int count = 0;
+
+      if (retryFile.existsSync()) {
+        final content = await retryFile.readAsString();
+        count = int.tryParse(content.trim()) ?? 0;
+      }
+
+      count++;
+      await retryFile.writeAsString('$count', flush: true);
+      return count;
+    } catch (_) {
+      return 1;
+    }
+  }
+
+  /// Cleans up the sidecar `.retry` file when a payload succeeds.
+  static Future<void> _clearRetryCount(File file) async {
+    try {
+      final retryFile = File('${file.path}.retry');
+      if (retryFile.existsSync()) {
+        await retryFile.delete();
+      }
+    } catch (_) {}
   }
 }
