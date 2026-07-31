@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/compare/hyperdrive_labs_telemetry-v1.0.1...hyperdrive_labs_telemetry-v1.1.0) (2026-07-31)
+
+
+### Features
+
+* add better retry and deadlock mechanism using dead-letter queue and .retry sidecar files ([100e057](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/commit/100e057b45c6a932685e37ecd1c6fffb8c6788de))
+* add logging implementation using the default 'logging' package ([a2bc69a](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/commit/a2bc69af61979e7e2a8dca02cb5bd298cc0b8de6))
+
+
+### Bug Fixes
+
+* properly add version to DiskQueueSpanExporter scopeSpans.scope ([7453dba](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/commit/7453dba6c41caa21b6a40fe51ffe57b00f76d25b))
+
 ## [1.0.1](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/compare/hyperdrive_labs_telemetry-v1.0.0...hyperdrive_labs_telemetry-v1.0.1) (2026-07-26)
 
 
