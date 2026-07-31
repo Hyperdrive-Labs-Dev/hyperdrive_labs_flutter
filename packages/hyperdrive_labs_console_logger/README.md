@@ -1,4 +1,4 @@
-# Hyperdrive Labs Console Logger (`hyperdrive_labs_console_logger`)
+# Hyperdrive Labs Console Logger
 
 A lightweight, developer-friendly Flutter/Dart console logger that transforms [`package:logging`](https://pub.dev/packages/logging) records into structured, ANSI-colored box frames with emoji tags.
 
