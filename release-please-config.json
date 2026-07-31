@@ -4,7 +4,8 @@
       "release-type": "dart"
     },
     "packages/hyperdrive_labs_console_logger": {
-      "release-type": "dart"
+      "release-type": "dart",
+      "bootstrap-sha": "2ace5b07a8c35dbf89b28549c71f28f53264e43a"
     }
   }
 }
