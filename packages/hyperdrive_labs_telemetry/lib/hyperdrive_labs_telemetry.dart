@@ -6,8 +6,11 @@ import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:hyperdrive_labs_telemetry/hyperdrive_labs_telemetry.dart';
 import 'package:hyperdrive_labs_telemetry/src/build_device_resource.dart';
+import 'package:hyperdrive_labs_telemetry/src/disk_queue_log_exporter.dart';
 import 'package:hyperdrive_labs_telemetry/src/disk_queue_span_exporter.dart';
+import 'package:hyperdrive_labs_telemetry/src/otel_logging_handler.dart';
 import 'package:hyperdrive_labs_telemetry/src/otel_signal_type.dart';
+import 'package:logging/logging.dart' as log;
 import 'package:opentelemetry/api.dart' as otel;
 import 'package:opentelemetry/sdk.dart' as otel_sdk;
 import 'package:path_provider/path_provider.dart';
@@ -74,17 +77,20 @@ class HyperdriveLabsTelemetry with WidgetsBindingObserver {
   /// Initializes the offline-first OpenTelemetry SDK pipeline.
   ///
   /// Connects global error handlers, starts a background flush timer set to [flushInterval],
-  /// attaches app lifecycle observers, and executes [runAppCallback].
+  /// configures log severity thresholds via [logLevel], attaches app lifecycle observers,
+  /// and executes [runAppCallback].
   ///
   /// Parameters default to `--dart-define` environment variables:
   /// - [otlpEndpoint]: Fallback `--dart-define=OTEL_EXPORTER_OTLP_ENDPOINT=...`
   /// - [headers]: Fallback `--dart-define=OTEL_EXPORTER_OTLP_HEADERS=...`
   /// - [serviceName]: Fallback `--dart-define=OTEL_SERVICE_NAME=...`
+  /// - [logLevel]: Minimum severity for OTLP log export (Default: [log.Level.INFO]). Fallback `--dart-define=OTEL_LOG_LEVEL=...`
   /// - [flushInterval]: Periodic auto-flush interval (Default: 10 seconds).
   static Future<void> init({
     Uri? otlpEndpoint,
     Map<String, String>? headers,
     String? serviceName,
+    log.Level? logLevel,
     Duration flushInterval = const Duration(seconds: 10),
     required FutureOr<void> Function() runAppCallback,
   }) async {
@@ -104,13 +110,15 @@ class HyperdriveLabsTelemetry with WidgetsBindingObserver {
         serviceName ??
         (_envServiceName.isNotEmpty ? _envServiceName : 'flutter_app');
 
+    final resolvedLogLevel = logLevel ?? _parseLogLevel(_envLogLevel);
+
     final storageDir = await _getStorageDir();
     final queueDir = Directory('${storageDir.path}/otel_queue');
 
     final deviceResource = await buildDeviceResource(resolvedServiceName);
 
-    final exporter = DiskQueueSpanExporter(queueDir: queueDir);
-    final processor = otel_sdk.SimpleSpanProcessor(exporter);
+    final spanExporter = DiskQueueSpanExporter(queueDir: queueDir);
+    final processor = otel_sdk.SimpleSpanProcessor(spanExporter);
 
     otel.registerGlobalTracerProvider(
       otel_sdk.TracerProviderBase(
@@ -118,6 +126,20 @@ class HyperdriveLabsTelemetry with WidgetsBindingObserver {
         resource: deviceResource,
       ),
     );
+
+    final logExporter = DiskQueueLogExporter(
+      queueDir: queueDir,
+      resourceAttributes: deviceResource.attributes.keys
+          .fold<Map<String, String>>({}, (map, key) {
+            map[key] = deviceResource.attributes.get(key).toString();
+            return map;
+          }),
+    );
+
+    // Ensure package:logging captures all events globally
+    log.Logger.root.level = log.Level.ALL;
+    // Attach handler using configured minimum log level
+    OtelLoggingHandler(logExporter, minLevel: resolvedLogLevel).attach();
 
     WidgetsBinding.instance.addObserver(_instance);
 
@@ -415,5 +437,41 @@ class HyperdriveLabsTelemetry with WidgetsBindingObserver {
         await retryFile.delete();
       }
     } catch (_) {}
+  }
+
+  static const String _envLogLevel = String.fromEnvironment(
+    'OTEL_LOG_LEVEL',
+    defaultValue: 'INFO',
+  );
+
+  static log.Level _parseLogLevel(String levelName) {
+    switch (levelName.toUpperCase()) {
+      case 'ALL':
+        return log.Level.ALL;
+      case 'FINEST':
+      case 'TRACER':
+        return log.Level.FINEST;
+      case 'FINER':
+        return log.Level.FINER;
+      case 'FINE':
+      case 'DEBUG':
+        return log.Level.FINE;
+      case 'CONFIG':
+        return log.Level.CONFIG;
+      case 'INFO':
+        return log.Level.INFO;
+      case 'WARNING':
+      case 'WARN':
+        return log.Level.WARNING;
+      case 'SEVERE':
+      case 'ERROR':
+        return log.Level.SEVERE;
+      case 'SHOUT':
+        return log.Level.SHOUT;
+      case 'OFF':
+        return log.Level.OFF;
+      default:
+        return log.Level.INFO;
+    }
   }
 }

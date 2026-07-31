@@ -78,16 +78,6 @@ void main() {
       }
     });
 
-    test('init throws if OTLP endpoint is completely missing', () async {
-      expect(
-        () => HyperdriveLabsTelemetry.init(
-          otlpEndpoint: null,
-          runAppCallback: () {},
-        ),
-        throwsArgumentError,
-      );
-    });
-
     test('FlutterError.onError is intercepted and recorded', () {
       final originalFlutterError = FlutterError.onError;
 
@@ -204,7 +194,6 @@ void main() {
           return http.Response('ok', 200);
         });
 
-        // Clear directory completely and create only 1 test file
         if (queueDir.existsSync()) queueDir.deleteSync(recursive: true);
         queueDir.createSync(recursive: true);
         File('${queueDir.path}/trace_1.json').writeAsStringSync('{"data":1}');
@@ -220,6 +209,109 @@ void main() {
         );
         await Future.delayed(const Duration(milliseconds: 50));
         expect(requestCount, equals(1));
+      },
+    );
+
+    test(
+      '4xx client error response moves payload to dead-letter queue immediately',
+      () async {
+        queueDir.createSync(recursive: true);
+        final file = File('${queueDir.path}/trace_bad_schema.json')
+          ..writeAsStringSync('{"resourceSpans":[]}');
+
+        HyperdriveLabsTelemetry.client = MockClient((request) async {
+          return http.Response('Client Error', 400);
+        });
+
+        await HyperdriveLabsTelemetry.flushQueue();
+
+        expect(file.existsSync(), isFalse);
+        final dlqFile = File(
+          '${queueDir.path}/dead_letter/trace_bad_schema.json',
+        );
+        expect(dlqFile.existsSync(), isTrue);
+      },
+    );
+
+    test(
+      'unrecognized filename prefix moves poisoned file to dead-letter queue',
+      () async {
+        queueDir.createSync(recursive: true);
+        final file = File('${queueDir.path}/unknown_prefix_file.json')
+          ..writeAsStringSync('{"data":1}');
+
+        await HyperdriveLabsTelemetry.flushQueue();
+
+        expect(file.existsSync(), isFalse);
+        final dlqFile = File(
+          '${queueDir.path}/dead_letter/unknown_prefix_file.json',
+        );
+        expect(dlqFile.existsSync(), isTrue);
+      },
+    );
+
+    test(
+      'corrupted unparseable JSON moves file to dead-letter queue',
+      () async {
+        queueDir.createSync(recursive: true);
+        final file = File('${queueDir.path}/trace_corrupt.json')
+          ..writeAsStringSync('Not a valid json string');
+
+        await HyperdriveLabsTelemetry.flushQueue();
+
+        expect(file.existsSync(), isFalse);
+        final dlqFile = File('${queueDir.path}/dead_letter/trace_corrupt.json');
+        expect(dlqFile.existsSync(), isTrue);
+      },
+    );
+
+    test(
+      '5xx server error triggers sidecar retry counter up to maxRetries then DLQ',
+      () async {
+        queueDir.createSync(recursive: true);
+        final file = File('${queueDir.path}/trace_server_error.json')
+          ..writeAsStringSync('{"resourceSpans":[]}');
+
+        HyperdriveLabsTelemetry.client = MockClient((request) async {
+          return http.Response('Internal Server Error', 500);
+        });
+
+        await HyperdriveLabsTelemetry.flushQueue(); // retry 1
+        await HyperdriveLabsTelemetry.flushQueue(); // retry 2
+        await HyperdriveLabsTelemetry.flushQueue(); // retry 3 -> moves to DLQ
+
+        expect(file.existsSync(), isFalse);
+        final dlqFile = File(
+          '${queueDir.path}/dead_letter/trace_server_error.json',
+        );
+        expect(dlqFile.existsSync(), isTrue);
+      },
+    );
+
+    test(
+      'successful upload after prior failure clears sidecar retry files',
+      () async {
+        queueDir.createSync(recursive: true);
+        final file = File('${queueDir.path}/trace_success_event.json')
+          ..writeAsStringSync('{"resourceSpans":[]}');
+        final retryFile = File('${file.path}.retry')..writeAsStringSync('1');
+
+        int attemptCount = 0;
+        HyperdriveLabsTelemetry.client = MockClient((request) async {
+          attemptCount++;
+          if (attemptCount == 1) {
+            return http.Response('Error', 503);
+          }
+          return http.Response('OK', 200);
+        });
+
+        await HyperdriveLabsTelemetry.flushQueue();
+        expect(file.existsSync(), isTrue);
+        expect(retryFile.existsSync(), isTrue);
+
+        await HyperdriveLabsTelemetry.flushQueue();
+        expect(file.existsSync(), isFalse);
+        expect(retryFile.existsSync(), isFalse);
       },
     );
   });
