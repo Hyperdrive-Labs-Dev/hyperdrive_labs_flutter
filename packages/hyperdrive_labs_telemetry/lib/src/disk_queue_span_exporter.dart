@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:hyperdrive_labs_telemetry/src/version.dart';
 import 'package:opentelemetry/api.dart' as otel;
 import 'package:opentelemetry/sdk.dart' as otel_sdk;
 
@@ -39,7 +40,10 @@ class DiskQueueSpanExporter implements otel_sdk.SpanExporter {
             },
             'scopeSpans': [
               {
-                'scope': {'name': 'hyperdrive_labs_telemetry'},
+                'scope': {
+                  'name': 'hyperdrive_labs_telemetry',
+                  'version': packageVersion,
+                },
                 'spans': spans.map(_spanToOtlpJson).toList(),
               },
             ],
