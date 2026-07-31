@@ -71,7 +71,7 @@ void main() {
         expect(getEmojiForLevel(Level.SEVERE), equals('❌'));
         expect(getEmojiForLevel(Level.WARNING), equals('⚠️'));
         expect(getEmojiForLevel(Level.INFO), equals('ℹ️'));
-        expect(getEmojiForLevel(Level.FINE), equals('🐛'));
+        expect(getEmojiForLevel(Level.FINE), equals('🔍'));
       });
     });
 

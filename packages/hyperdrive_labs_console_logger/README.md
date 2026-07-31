@@ -8,7 +8,7 @@ A lightweight, developer-friendly Flutter/Dart console logger that transforms [`
 
 - **Visual Framing:** Renders clean, multi-line boxed logs with distinct top and bottom borders.
 - **Color-Coded Severity:** Uses native ANSI escape sequences to color-code logs by severity level.
-- **Emoji Categorization:** Automatically maps log levels to intuitive emoji tags (`ℹ️`, `⚠️`, `❌`, `💥`, `🐛`).
+- **Emoji Categorization:** Automatically maps log levels to intuitive emoji tags (`ℹ️`, `⚠️`, `❌`, `💥`, `🔍`).
 - **Non-Truncating Output:** Leverages Dart's `developer.log` under the hood to bypass IDE string-length truncations for large payloads or stack traces.
 - **Complete Separation of Concerns:** Acts purely as a terminal visualizer. It leaves global filtering, log level definitions, and telemetry storage entirely to your upstream analytics/telemetry packages.
 

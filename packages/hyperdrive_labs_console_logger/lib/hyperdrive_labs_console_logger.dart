@@ -103,7 +103,7 @@ String _getEmojiForLevel(Level level) {
   if (level >= Level.SEVERE) return '❌'; // Error
   if (level >= Level.WARNING) return '⚠️'; // Warning
   if (level >= Level.INFO) return 'ℹ️'; // Info
-  return '🐛'; // Debug / Fine
+  return '🔍'; // Debug / Fine
 }
 
 /// ANSI escape codes for Talker-like colors in the console
