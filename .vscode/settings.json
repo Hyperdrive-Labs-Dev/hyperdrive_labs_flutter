@@ -1,5 +1,6 @@
 {
   "conventionalCommits.scopes": [
-    "hyperdrive_labs_telemetry"
+    "hyperdrive_labs_telemetry",
+    "hyperdrive_labs_console_logger"
   ]
 }
