@@ -4,3 +4,4 @@ environment:
 
 workspace:
   - packages/hyperdrive_labs_telemetry
+  - packages/hyperdrive_labs_console_logger

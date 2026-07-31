@@ -2,6 +2,9 @@
   "packages": {
     "packages/hyperdrive_labs_telemetry": {
       "release-type": "dart"
+    },
+    "packages/hyperdrive_labs_console_logger": {
+      "release-type": "dart"
     }
   }
 }
