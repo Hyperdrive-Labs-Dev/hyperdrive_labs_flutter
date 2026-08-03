@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/compare/hyperdrive_labs_telemetry-v1.1.0...hyperdrive_labs_telemetry-v1.2.0) (2026-08-03)
+
+
+### Features
+
+* **hyperdrive_labs_console_logger:** add attachConsoleLogger ([1d0ce05](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/commit/1d0ce056b8888ef5c378b7705fd1b0c52d47a0df))
+
 ## [1.1.0](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/compare/hyperdrive_labs_telemetry-v1.0.1...hyperdrive_labs_telemetry-v1.1.0) (2026-07-31)
 
 
