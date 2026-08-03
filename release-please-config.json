@@ -1,11 +1,12 @@
 {
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "2ace5b07a8c35dbf89b28549c71f28f53264e43a",
   "packages": {
     "packages/hyperdrive_labs_telemetry": {
       "release-type": "dart"
     },
     "packages/hyperdrive_labs_console_logger": {
-      "release-type": "dart",
-      "bootstrap-sha": "2ace5b07a8c35dbf89b28549c71f28f53264e43a"
+      "release-type": "dart"
     }
   }
 }
