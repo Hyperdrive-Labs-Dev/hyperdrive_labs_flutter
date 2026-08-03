@@ -1,6 +1,5 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "bootstrap-sha": "2ace5b07a8c35dbf89b28549c71f28f53264e43a",
   "separate-pull-requests": true,
   "packages": {
     "packages/hyperdrive_labs_telemetry": {
