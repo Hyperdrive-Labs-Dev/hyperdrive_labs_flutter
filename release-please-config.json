@@ -3,10 +3,6 @@
   "separate-pull-requests": true,
   "bootstrap-sha": "dc36d5e122c2075ffae089fb3d992c53b7ab89b8",
   "packages": {
-    "packages/hyperdrive_labs_telemetry": {
-      "release-type": "dart",
-      "package-name": "hyperdrive_labs_telemetry"
-    },
     "packages/hyperdrive_labs_console_logger": {
       "release-type": "dart",
       "package-name": "hyperdrive_labs_console_logger"
