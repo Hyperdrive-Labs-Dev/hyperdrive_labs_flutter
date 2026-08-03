@@ -1,6 +1,6 @@
 name: hyperdrive_labs_console_logger
 description: "A lightweight, developer-friendly Flutter console logger that transforms package:logging records into structured, ANSI-colored box frames with emoji tags."
-version: 0.0.1
+version: 0.1.0
 homepage: https://www.hyperdrivelabs.dev/
 resolution: workspace
 
