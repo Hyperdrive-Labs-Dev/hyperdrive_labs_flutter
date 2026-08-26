@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.0](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/compare/hyperdrive_labs_telemetry-v1.1.0...hyperdrive_labs_telemetry-v1.2.0) (2026-08-26)
+
+
+### Features
+
+* **hyperdrive_labs_console_logger:** add attachConsoleLogger ([1d0ce05](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/commit/1d0ce056b8888ef5c378b7705fd1b0c52d47a0df))
+* **hyperdrive_labs_console_logger:** change debug emoji from 🐛 to 🔍 to prevent bug connotation confusion ([8c79183](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/commit/8c791839cb94c3da8d5ba4de1ebfb6a72447a312))
+* **hyperdrive_labs_telemetry:** update device_info_plus to ^13.2.0, dio to ^5.11.0 and package_info_plus to ^10.2.1 ([1627a9e](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/commit/1627a9ee8d76871e302c57a0291e5818172414b9))
+
 ## [1.1.0](https://github.com/Hyperdrive-Labs-Dev/hyperdrive_labs_flutter/compare/hyperdrive_labs_telemetry-v1.0.1...hyperdrive_labs_telemetry-v1.1.0) (2026-07-31)
 
 
